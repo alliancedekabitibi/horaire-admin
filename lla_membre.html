@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLA 2026 — Mon horaire</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1a1a1a;min-height:100vh}
+.header{padding:.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between}
+.header.arb{background:#0C447C}.header.chro{background:#27500A}.header.unknown{background:#1a1a1a}
+.header-title{font-size:15px;font-weight:500;color:#fff}
+.header-sub{font-size:12px;color:rgba(255,255,255,0.65);margin-top:1px}
+.badge-role{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500}
+.badge-arb{background:#E6F1FB;color:#0C447C}.badge-chro{background:#EAF3DE;color:#27500A}
+.tabs{display:flex;gap:2px;padding:.75rem 1.25rem 0;border-bottom:1px solid #e5e3de;background:#fff}
+.tab{padding:7px 14px;font-size:13px;cursor:pointer;border:none;background:none;color:#666;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:all .15s}
+.tab.active{color:#1a1a1a;border-bottom-color:#1a1a1a;font-weight:500}
+.tab:hover:not(.active){color:#1a1a1a}
+.content{padding:1.25rem;max-width:680px;margin:0 auto}
+.card{background:#fff;border:1px solid #e5e3de;border-radius:12px;padding:.875rem 1rem;margin-bottom:10px}
+.card.mine{border:2px solid #185FA5;background:#f0f6fd}
+.card.mine-chro{border:2px solid #3B6D11;background:#f2f9ea}
+.btn{padding:7px 14px;font-size:13px;cursor:pointer;border-radius:8px;border:1px solid #ddd;background:#fff;color:#1a1a1a;transition:all .15s}
+.btn:hover{background:#f5f4f0}
+.btn-sm{padding:4px 11px;font-size:12px}
+.btn-choisir{background:#EAF3DE;color:#27500A;border-color:#639922;font-weight:500}
+.btn-choisir:hover{background:#C0DD97}
+.btn-choisir.arb{background:#E6F1FB;color:#0C447C;border-color:#378ADD}
+.btn-choisir.arb:hover{background:#B5D4F4}
+.btn-retirer{background:#FCEBEB;color:#791F1F;border-color:#E24B4A}
+.btn-retirer:hover{background:#F7C1C1}
+.btn-confirmer{background:#1a1a1a;color:#fff;border-color:#1a1a1a;font-size:14px;padding:10px 20px;width:100%;justify-content:center;border-radius:10px}
+.btn-confirmer:hover{opacity:.85}
+.btn-confirmer:disabled{opacity:.4;cursor:not-allowed}
+.badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;font-weight:500}
+.b-mine{background:#FAEEDA;color:#633806;font-weight:500}
+.semaine-nav{display:flex;align-items:center;gap:8px;margin-bottom:.875rem}
+.semaine-label{font-size:14px;font-weight:500;flex:1;text-align:center}
+.empty{text-align:center;color:#666;font-size:13px;padding:1.5rem 0}
+.num-badge{background:#f0ede8;border-radius:4px;padding:1px 5px;font-size:11px;color:#666;margin-right:4px}
+.week-header{font-size:11px;font-weight:500;color:#666;text-transform:uppercase;margin:10px 0 4px}
+.partie-sub{font-size:12px;color:#666;margin-top:2px}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.draft-banner{padding:.875rem 1rem;border-radius:10px;margin-bottom:1rem}
+.draft-banner.arb{background:#E6F1FB;border:1px solid #85B7EB}
+.draft-banner.chro{background:#EAF3DE;border:1px solid #97C459}
+.draft-banner.wait{background:#f5f4f0;border:1px solid #ddd}
+.draft-banner.done{background:#EAF3DE;border:1px solid #639922}
+.draft-title{font-size:14px;font-weight:500}
+.draft-sub{font-size:12px;margin-top:3px;color:#555}
+.page{display:none}.page.active{display:block}
+.pris-badge{font-size:11px;padding:2px 7px;border-radius:20px;background:#f0ede8;color:#666;white-space:nowrap}
+.confirmer-box{background:#fff;border:1px solid #e5e3de;border-radius:12px;padding:1rem 1.25rem;margin-bottom:12px}
+.confirmer-box.confirmed{background:#EAF3DE;border-color:#639922}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:1rem}
+.metric{background:#fff;border:1px solid #e5e3de;border-radius:8px;padding:.75rem}
+.metric-label{font-size:11px;color:#666;margin-bottom:3px}
+.metric-value{font-size:20px;font-weight:500}
+.error-screen{text-align:center;padding:3rem 1.5rem}
+.loading-screen{text-align:center;padding:3rem;color:#666}
+.spinner{width:32px;height:32px;border:3px solid #e5e3de;border-top-color:#1a1a1a;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 1rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="loading-screen" class="loading-screen">
+  <div class="spinner"></div>
+  <div style="font-size:14px;color:#666">Connexion en cours...</div>
+</div>
+
+<div id="app" style="display:none"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, get, onValue, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const PARTIES_LLA = [{"id":"p1","number":1,"local":"Nortech solutions","visiteur":"Black Knight","date":"2026-05-11","heure":"6:00PM"},{"id":"p2","number":2,"local":"Hardy Construction","visiteur":"Les Starlettes","date":"2026-05-11","heure":"6:55PM"},{"id":"p3","number":3,"local":"Deshaies","visiteur":"Flamingos","date":"2026-05-11","heure":"7:50PM"},{"id":"p4","number":4,"local":"LMS Industrie","visiteur":"Roteux","date":"2026-05-11","heure":"8:45PM"},{"id":"p5","number":5,"local":"Bar chez Frid","visiteur":"Hamel Arpentage","date":"2026-05-11","heure":"9:40PM"},{"id":"p6","number":6,"local":"Mass'eau'Cryolipo","visiteur":"Mes dentistes","date":"2026-05-12","heure":"6:00PM"},{"id":"p7","number":7,"local":"Bar chez Frid","visiteur":"Hamel Arpentage","date":"2026-05-12","heure":"6:55PM"},{"id":"p8","number":8,"local":"LMS Industrie","visiteur":"Rihnolining","date":"2026-05-12","heure":"7:50PM"},{"id":"p9","number":9,"local":"Le Moose","visiteur":"Roteux","date":"2026-05-12","heure":"8:45PM"},{"id":"p10","number":10,"local":"Deshaies","visiteur":"La Brosse","date":"2026-05-12","heure":"9:40PM"},{"id":"p11","number":11,"local":"Flamingos","visiteur":"Kirk Hockey Club","date":"2026-05-13","heure":"6:00PM"},{"id":"p12","number":12,"local":"comz","visiteur":"Black Knight","date":"2026-05-13","heure":"6:55PM"},{"id":"p13","number":13,"local":"Athena","visiteur":"Mass'eau'Cryolipo","date":"2026-05-13","heure":"7:50PM"},{"id":"p14","number":14,"local":"Les supers amis","visiteur":"Nortech solutions","date":"2026-05-13","heure":"8:45PM"},{"id":"p15","number":15,"local":"Baho Média","visiteur":"Centre Visuel des Eskers","date":"2026-05-13","heure":"9:40PM"},{"id":"p16","number":16,"local":"Kirk Hockey Club","visiteur":"Rihnolining","date":"2026-05-14","heure":"6:00PM"},{"id":"p17","number":17,"local":"Hyundai Amos","visiteur":"Mcdo","date":"2026-05-14","heure":"6:55PM"},{"id":"p18","number":18,"local":"Hardy Construction","visiteur":"Mes dentistes","date":"2026-05-14","heure":"7:50PM"},{"id":"p19","number":19,"local":"Athena","visiteur":"Les Starlettes","date":"2026-05-14","heure":"8:45PM"},{"id":"p20","number":20,"local":"La Brosse","visiteur":"Le Moose","date":"2026-05-14","heure":"9:40PM"},{"id":"p21","number":21,"local":"Deshaies","visiteur":"LMS Industrie","date":"2026-05-18","heure":"6:00PM"},{"id":"p22","number":22,"local":"Kirk Hockey Club","visiteur":"Le Moose","date":"2026-05-18","heure":"6:55PM"},{"id":"p23","number":23,"local":"Hamel Arpentage","visiteur":"Pikogan Maikan","date":"2026-05-18","heure":"7:50PM"},{"id":"p24","number":24,"local":"Mass'eau'Cryolipo","visiteur":"Thunder","date":"2026-05-18","heure":"8:45PM"},{"id":"p25","number":25,"local":"comz","visiteur":"La Brosse","date":"2026-05-18","heure":"9:40PM"},{"id":"p26","number":26,"local":"Hardy Construction","visiteur":"Les Crinquées","date":"2026-05-19","heure":"6:00PM"},{"id":"p27","number":27,"local":"Flamingos","visiteur":"Les supers amis","date":"2026-05-19","heure":"6:55PM"},{"id":"p28","number":28,"local":"Le Moose","visiteur":"Rihnolining","date":"2026-05-19","heure":"7:50PM"},{"id":"p29","number":29,"local":"Baho Média","visiteur":"Pikogan Nighthawks","date":"2026-05-19","heure":"8:45PM"},{"id":"p30","number":30,"local":"Mcdo","visiteur":"Pikogan Maikan","date":"2026-05-19","heure":"9:40PM"},{"id":"p31","number":31,"local":"Athena","visiteur":"Hardy Construction","date":"2026-05-20","heure":"6:00PM"},{"id":"p32","number":32,"local":"Deshaies","visiteur":"Roteux","date":"2026-05-20","heure":"6:55PM"},{"id":"p33","number":33,"local":"Hamel Arpentage","visiteur":"Hyundai Amos","date":"2026-05-20","heure":"7:50PM"},{"id":"p34","number":34,"local":"Centre Visuel des Eskers","visiteur":"La Relève","date":"2026-05-20","heure":"8:45PM"},{"id":"p35","number":35,"local":"comz","visiteur":"Black Knight","date":"2026-05-20","heure":"9:40PM"},{"id":"p36","number":36,"local":"Mes dentistes","visiteur":"Les Starlettes","date":"2026-05-21","heure":"6:00PM"},{"id":"p37","number":37,"local":"Centre Visuel des Eskers","visiteur":"La Relève","date":"2026-05-21","heure":"6:55PM"},{"id":"p38","number":38,"local":"Kirk Hockey Club","visiteur":"LMS Industrie","date":"2026-05-21","heure":"7:50PM"},{"id":"p39","number":39,"local":"Pikogan Spartans","visiteur":"Washaw Sibi Falcons","date":"2026-05-21","heure":"8:45PM"},{"id":"p40","number":40,"local":"Baho Média","visiteur":"Pikogan Nighthawks","date":"2026-05-21","heure":"9:40PM"},{"id":"p41","number":41,"local":"Mass'eau'Cryolipo","visiteur":"Thunder","date":"2026-05-25","heure":"6:00PM"},{"id":"p42","number":42,"local":"Baho Média","visiteur":"Pikogan Nighthawks","date":"2026-05-25","heure":"6:55PM"},{"id":"p43","number":43,"local":"Hardy Construction","visiteur":"Mes dentistes","date":"2026-05-25","heure":"7:50PM"},{"id":"p44","number":44,"local":"Rihnolining","visiteur":"Roteux","date":"2026-05-25","heure":"8:45PM"},{"id":"p45","number":45,"local":"Hamel Arpentage","visiteur":"Hyundai Amos","date":"2026-05-25","heure":"9:40PM"},{"id":"p46","number":46,"local":"Les Crinquées","visiteur":"Les Starlettes","date":"2026-05-26","heure":"6:00PM"},{"id":"p47","number":47,"local":"Pikogan Spartans","visiteur":"Washaw Sibi Falcons","date":"2026-05-26","heure":"6:55PM"},{"id":"p48","number":48,"local":"Flamingos","visiteur":"LMS Industrie","date":"2026-05-26","heure":"7:50PM"},{"id":"p49","number":49,"local":"Les supers amis","visiteur":"Black Knight","date":"2026-05-26","heure":"8:45PM"},{"id":"p50","number":50,"local":"Centre Visuel des Eskers","visiteur":"La Relève","date":"2026-05-26","heure":"9:40PM"},{"id":"p51","number":51,"local":"Centre Visuel des Eskers","visiteur":"Washaw Sibi Falcons","date":"2026-05-27","heure":"6:00PM"},{"id":"p52","number":52,"local":"Hamel Arpentage","visiteur":"Mcdo","date":"2026-05-27","heure":"6:55PM"},{"id":"p53","number":53,"local":"Bar chez Frid","visiteur":"Pikogan Maikan","date":"2026-05-27","heure":"7:50PM"},{"id":"p54","number":54,"local":"Le Moose","visiteur":"Nortech solutions","date":"2026-05-27","heure":"8:45PM"},{"id":"p55","number":55,"local":"Hardy Construction","visiteur":"Mass'eau'Cryolipo","date":"2026-05-27","heure":"9:40PM"},{"id":"p56","number":56,"local":"Deshaies","visiteur":"Le Moose","date":"2026-05-28","heure":"6:00PM"},{"id":"p57","number":57,"local":"comz","visiteur":"Rihnolining","date":"2026-05-28","heure":"6:55PM"},{"id":"p58","number":58,"local":"Les supers amis","visiteur":"LMS Industrie","date":"2026-05-28","heure":"7:50PM"},{"id":"p59","number":59,"local":"Hyundai Amos","visiteur":"Mcdo","date":"2026-05-28","heure":"8:45PM"},{"id":"p60","number":60,"local":"Roteux","visiteur":"Black Knight","date":"2026-05-28","heure":"9:40PM"},{"id":"p61","number":61,"local":"Bar chez Frid","visiteur":"Pikogan Maikan","date":"2026-06-01","heure":"6:00PM"},{"id":"p62","number":62,"local":"Athena","visiteur":"Les Starlettes","date":"2026-06-01","heure":"6:55PM"},{"id":"p63","number":63,"local":"Le Moose","visiteur":"Black Knight","date":"2026-06-01","heure":"7:50PM"},{"id":"p64","number":64,"local":"Les Crinquées","visiteur":"Mass'eau'Cryolipo","date":"2026-06-01","heure":"8:45PM"},{"id":"p65","number":65,"local":"Centre Visuel des Eskers","visiteur":"Pikogan Spartans","date":"2026-06-01","heure":"9:40PM"},{"id":"p66","number":66,"local":"Baho Média","visiteur":"Centre Visuel des Eskers","date":"2026-06-02","heure":"6:00PM"},{"id":"p67","number":67,"local":"La Relève","visiteur":"Washaw Sibi Falcons","date":"2026-06-02","heure":"6:55PM"},{"id":"p68","number":68,"local":"Mass'eau'Cryolipo","visiteur":"Thunder","date":"2026-06-02","heure":"7:50PM"},{"id":"p69","number":69,"local":"Hyundai Amos","visiteur":"Mcdo","date":"2026-06-02","heure":"8:45PM"},{"id":"p70","number":70,"local":"Deshaies","visiteur":"Nortech solutions","date":"2026-06-02","heure":"9:40PM"},{"id":"p71","number":71,"local":"Pikogan Nighthawks","visiteur":"Washaw Sibi Falcons","date":"2026-06-03","heure":"6:00PM"},{"id":"p72","number":72,"local":"Kirk Hockey Club","visiteur":"Les supers amis","date":"2026-06-03","heure":"6:55PM"},{"id":"p73","number":73,"local":"Le Moose","visiteur":"LMS Industrie","date":"2026-06-03","heure":"7:50PM"},{"id":"p74","number":74,"local":"Flamingos","visiteur":"La Brosse","date":"2026-06-03","heure":"8:45PM"},{"id":"p75","number":75,"local":"Hyundai Amos","visiteur":"Pikogan Maikan","date":"2026-06-03","heure":"9:40PM"},{"id":"p76","number":76,"local":"Hardy Construction","visiteur":"Les Starlettes","date":"2026-06-04","heure":"6:00PM"},{"id":"p77","number":77,"local":"comz","visiteur":"Deshaies","date":"2026-06-04","heure":"6:55PM"},{"id":"p78","number":78,"local":"Kirk Hockey Club","visiteur":"Black Knight","date":"2026-06-04","heure":"7:50PM"},{"id":"p79","number":79,"local":"Athena","visiteur":"Les Crinquées","date":"2026-06-04","heure":"8:45PM"},{"id":"p80","number":80,"local":"Baho Média","visiteur":"La Relève","date":"2026-06-04","heure":"9:40PM"},{"id":"p81","number":81,"local":"Les Crinquées","visiteur":"Thunder","date":"2026-06-08","heure":"6:00PM"},{"id":"p82","number":82,"local":"Deshaies","visiteur":"Le Moose","date":"2026-06-08","heure":"6:55PM"},{"id":"p83","number":83,"local":"Pikogan Spartans","visiteur":"Washaw Sibi Falcons","date":"2026-06-08","heure":"7:50PM"},{"id":"p84","number":84,"local":"Athena","visiteur":"Mes dentistes","date":"2026-06-08","heure":"8:45PM"},{"id":"p85","number":85,"local":"Kirk Hockey Club","visiteur":"Nortech solutions","date":"2026-06-08","heure":"9:40PM"},{"id":"p86","number":86,"local":"Hyundai Amos","visiteur":"Mcdo","date":"2026-06-09","heure":"6:00PM"},{"id":"p87","number":87,"local":"Bar chez Frid","visiteur":"Pikogan Maikan","date":"2026-06-09","heure":"6:55PM"},{"id":"p88","number":88,"local":"Deshaies","visiteur":"LMS Industrie","date":"2026-06-09","heure":"7:50PM"},{"id":"p89","number":89,"local":"Mass'eau'Cryolipo","visiteur":"Mes dentistes","date":"2026-06-09","heure":"8:45PM"},{"id":"p90","number":90,"local":"Centre Visuel des Eskers","visiteur":"Pikogan Nighthawks","date":"2026-06-09","heure":"9:40PM"},{"id":"p91","number":91,"local":"Kirk Hockey Club","visiteur":"LMS Industrie","date":"2026-06-10","heure":"6:00PM"},{"id":"p92","number":92,"local":"Mass'eau'Cryolipo","visiteur":"Thunder","date":"2026-06-10","heure":"6:55PM"},{"id":"p93","number":93,"local":"Flamingos","visiteur":"Black Knight","date":"2026-06-10","heure":"7:50PM"},{"id":"p94","number":94,"local":"Les supers amis","visiteur":"Roteux","date":"2026-06-10","heure":"8:45PM"},{"id":"p95","number":95,"local":"comz","visiteur":"Nortech solutions","date":"2026-06-10","heure":"9:40PM"},{"id":"p96","number":96,"local":"Baho Média","visiteur":"Centre Visuel des Eskers","date":"2026-06-11","heure":"6:00PM"},{"id":"p97","number":97,"local":"Mcdo","visiteur":"Pikogan Maikan","date":"2026-06-11","heure":"6:55PM"},{"id":"p98","number":98,"local":"Le Moose","visiteur":"Les supers amis","date":"2026-06-11","heure":"7:50PM"},{"id":"p99","number":99,"local":"La Relève","visiteur":"Pikogan Spartans","date":"2026-06-11","heure":"8:45PM"},{"id":"p100","number":100,"local":"La Brosse","visiteur":"Roteux","date":"2026-06-11","heure":"9:40PM"},{"id":"p101","number":101,"local":"Mes dentistes","visiteur":"Les Starlettes","date":"2026-06-15","heure":"6:00PM"},{"id":"p102","number":102,"local":"Centre Visuel des Eskers","visiteur":"Washaw Sibi Falcons","date":"2026-06-15","heure":"6:55PM"},{"id":"p103","number":103,"local":"Les supers amis","visiteur":"Black Knight","date":"2026-06-15","heure":"7:50PM"},{"id":"p104","number":104,"local":"Bar chez Frid","visiteur":"Hyundai Amos","date":"2026-06-15","heure":"8:45PM"},{"id":"p105","number":105,"local":"Athena","visiteur":"Hardy Construction","date":"2026-06-15","heure":"9:40PM"},{"id":"p106","number":106,"local":"comz","visiteur":"Le Moose","date":"2026-06-16","heure":"6:00PM"},{"id":"p107","number":107,"local":"Baho Média","visiteur":"Washaw Sibi Falcons","date":"2026-06-16","heure":"6:55PM"},{"id":"p108","number":108,"local":"Les Crinquées","visiteur":"Mass'eau'Cryolipo","date":"2026-06-16","heure":"7:50PM"},{"id":"p109","number":109,"local":"Flamingos","visiteur":"Nortech solutions","date":"2026-06-16","heure":"8:45PM"},{"id":"p110","number":110,"local":"Deshaies","visiteur":"Roteux","date":"2026-06-16","heure":"9:40PM"},{"id":"p111","number":111,"local":"Kirk Hockey Club","visiteur":"La Brosse","date":"2026-06-17","heure":"6:00PM"},{"id":"p112","number":112,"local":"Hardy Construction","visiteur":"Mass'eau'Cryolipo","date":"2026-06-17","heure":"6:55PM"},{"id":"p113","number":113,"local":"Hamel Arpentage","visiteur":"Mcdo","date":"2026-06-17","heure":"7:50PM"},{"id":"p114","number":114,"local":"Centre Visuel des Eskers","visiteur":"Pikogan Spartans","date":"2026-06-17","heure":"8:45PM"},{"id":"p115","number":115,"local":"Deshaies","visiteur":"Rihnolining","date":"2026-06-17","heure":"9:40PM"},{"id":"p116","number":116,"local":"Thunder","visiteur":"Les Starlettes","date":"2026-06-18","heure":"6:00PM"},{"id":"p117","number":117,"local":"Bar chez Frid","visiteur":"Mcdo","date":"2026-06-18","heure":"6:55PM"},{"id":"p118","number":118,"local":"Flamingos","visiteur":"Rihnolining","date":"2026-06-18","heure":"7:50PM"},{"id":"p119","number":119,"local":"La Relève","visiteur":"Pikogan Nighthawks","date":"2026-06-18","heure":"8:45PM"},{"id":"p120","number":120,"local":"Baho Média","visiteur":"Pikogan Spartans","date":"2026-06-18","heure":"9:40PM"},{"id":"p121","number":121,"local":"Baho Média","visiteur":"Pikogan Spartans","date":"2026-06-22","heure":"6:00PM"},{"id":"p122","number":122,"local":"Mes dentistes","visiteur":"Les Starlettes","date":"2026-06-22","heure":"6:55PM"},{"id":"p123","number":123,"local":"Hamel Arpentage","visiteur":"Pikogan Maikan","date":"2026-06-22","heure":"7:50PM"},{"id":"p124","number":124,"local":"Bar chez Frid","visiteur":"Hyundai Amos","date":"2026-06-22","heure":"8:45PM"},{"id":"p125","number":125,"local":"Flamingos","visiteur":"Black Knight","date":"2026-06-22","heure":"9:40PM"},{"id":"p126","number":126,"local":"La Brosse","visiteur":"LMS Industrie","date":"2026-06-23","heure":"6:00PM"},{"id":"p127","number":127,"local":"Centre Visuel des Eskers","visiteur":"Washaw Sibi Falcons","date":"2026-06-23","heure":"6:55PM"},{"id":"p128","number":128,"local":"Baho Média","visiteur":"Pikogan Nighthawks","date":"2026-06-23","heure":"7:50PM"},{"id":"p129","number":129,"local":"Thunder","visiteur":"Les Starlettes","date":"2026-06-23","heure":"8:45PM"},{"id":"p130","number":130,"local":"Le Moose","visiteur":"Rihnolining","date":"2026-06-23","heure":"9:40PM"},{"id":"p131","number":131,"local":"Centre Visuel des Eskers","visiteur":"La Relève","date":"2026-06-24","heure":"6:00PM"},{"id":"p132","number":132,"local":"Kirk Hockey Club","visiteur":"Roteux","date":"2026-06-24","heure":"6:55PM"},{"id":"p133","number":133,"local":"La Brosse","visiteur":"Rihnolining","date":"2026-06-24","heure":"7:50PM"},{"id":"p134","number":134,"local":"Athena","visiteur":"Thunder","date":"2026-06-24","heure":"8:45PM"},{"id":"p135","number":135,"local":"comz","visiteur":"Les supers amis","date":"2026-06-24","heure":"9:40PM"},{"id":"p136","number":136,"local":"comz","visiteur":"Flamingos","date":"2026-06-25","heure":"6:00PM"},{"id":"p137","number":137,"local":"Athena","visiteur":"Mes dentistes","date":"2026-06-25","heure":"6:55PM"},{"id":"p138","number":138,"local":"Pikogan Spartans","visiteur":"Washaw Sibi Falcons","date":"2026-06-25","heure":"7:50PM"},{"id":"p139","number":139,"local":"Bar chez Frid","visiteur":"Mcdo","date":"2026-06-25","heure":"8:45PM"},{"id":"p140","number":140,"local":"Hamel Arpentage","visiteur":"Pikogan Maikan","date":"2026-06-25","heure":"9:40PM"},{"id":"p141","number":141,"local":"Athena","visiteur":"Hardy Construction","date":"2026-06-29","heure":"6:00PM"},{"id":"p142","number":142,"local":"Mcdo","visiteur":"Pikogan Maikan","date":"2026-06-29","heure":"6:55PM"},{"id":"p143","number":143,"local":"Nortech solutions","visiteur":"Roteux","date":"2026-06-29","heure":"7:50PM"},{"id":"p144","number":144,"local":"Pikogan Nighthawks","visiteur":"Pikogan Spartans","date":"2026-06-29","heure":"8:45PM"},{"id":"p145","number":145,"local":"Les Crinquées","visiteur":"Thunder","date":"2026-06-29","heure":"9:40PM"},{"id":"p146","number":146,"local":"Deshaies","visiteur":"Flamingos","date":"2026-06-30","heure":"6:00PM"},{"id":"p147","number":147,"local":"Les supers amis","visiteur":"Nortech solutions","date":"2026-06-30","heure":"6:55PM"},{"id":"p148","number":148,"local":"La Brosse","visiteur":"Rihnolining","date":"2026-06-30","heure":"7:50PM"},{"id":"p149","number":149,"local":"Hardy Construction","visiteur":"Les Starlettes","date":"2026-06-30","heure":"8:45PM"},{"id":"p150","number":150,"local":"La Relève","visiteur":"Pikogan Nighthawks","date":"2026-06-30","heure":"9:40PM"},{"id":"p151","number":151,"local":"Baho Média","visiteur":"Pikogan Spartans","date":"2026-07-01","heure":"6:00PM"},{"id":"p152","number":152,"local":"Rihnolining","visiteur":"Black Knight","date":"2026-07-01","heure":"6:55PM"},{"id":"p153","number":153,"local":"Hamel Arpentage","visiteur":"Mcdo","date":"2026-07-01","heure":"7:50PM"},{"id":"p154","number":154,"local":"Athena","visiteur":"Mes dentistes","date":"2026-07-01","heure":"8:45PM"},{"id":"p156","number":156,"local":"comz","visiteur":"Kirk Hockey Club","date":"2026-07-02","heure":"6:00PM"},{"id":"p157","number":157,"local":"Flamingos","visiteur":"Les supers amis","date":"2026-07-02","heure":"6:55PM"},{"id":"p158","number":158,"local":"Mes dentistes","visiteur":"Thunder","date":"2026-07-02","heure":"7:50PM"},{"id":"p159","number":159,"local":"Hamel Arpentage","visiteur":"Hyundai Amos","date":"2026-07-02","heure":"8:45PM"},{"id":"p160","number":160,"local":"Baho Média","visiteur":"La Relève","date":"2026-07-02","heure":"9:40PM"},{"id":"p161","number":161,"local":"Hardy Construction","visiteur":"Les Crinquées","date":"2026-07-06","heure":"6:00PM"},{"id":"p162","number":162,"local":"Hyundai Amos","visiteur":"Pikogan Maikan","date":"2026-07-06","heure":"6:55PM"},{"id":"p163","number":163,"local":"Kirk Hockey Club","visiteur":"Black Knight","date":"2026-07-06","heure":"7:50PM"},{"id":"p164","number":164,"local":"Mass'eau'Cryolipo","visiteur":"Mes dentistes","date":"2026-07-06","heure":"8:45PM"},{"id":"p165","number":165,"local":"La Brosse","visiteur":"Roteux","date":"2026-07-06","heure":"9:40PM"},{"id":"p166","number":166,"local":"comz","visiteur":"Nortech solutions","date":"2026-07-07","heure":"6:00PM"},{"id":"p167","number":167,"local":"Les supers amis","visiteur":"Rihnolining","date":"2026-07-07","heure":"6:55PM"},{"id":"p168","number":168,"local":"La Brosse","visiteur":"Black Knight","date":"2026-07-07","heure":"7:50PM"},{"id":"p169","number":169,"local":"Baho Média","visiteur":"La Relève","date":"2026-07-07","heure":"8:45PM"},{"id":"p170","number":170,"local":"Pikogan Nighthawks","visiteur":"Washaw Sibi Falcons","date":"2026-07-07","heure":"9:40PM"},{"id":"p171","number":171,"local":"comz","visiteur":"Roteux","date":"2026-07-08","heure":"6:00PM"},{"id":"p172","number":172,"local":"Bar chez Frid","visiteur":"Hyundai Amos","date":"2026-07-08","heure":"6:55PM"},{"id":"p173","number":173,"local":"Les Crinquées","visiteur":"Les Starlettes","date":"2026-07-08","heure":"7:50PM"},{"id":"p174","number":174,"local":"Kirk Hockey Club","visiteur":"Les supers amis","date":"2026-07-08","heure":"8:45PM"},{"id":"p175","number":175,"local":"Pikogan Nighthawks","visiteur":"Pikogan Spartans","date":"2026-07-08","heure":"9:40PM"},{"id":"p176","number":176,"local":"La Relève","visiteur":"Washaw Sibi Falcons","date":"2026-07-09","heure":"6:00PM"},{"id":"p177","number":177,"local":"Mes dentistes","visiteur":"Thunder","date":"2026-07-09","heure":"6:55PM"},{"id":"p178","number":178,"local":"LMS Industrie","visiteur":"Nortech solutions","date":"2026-07-09","heure":"7:50PM"},{"id":"p179","number":179,"local":"Flamingos","visiteur":"Le Moose","date":"2026-07-09","heure":"8:45PM"},{"id":"p180","number":180,"local":"Bar chez Frid","visiteur":"Pikogan Maikan","date":"2026-07-09","heure":"9:40PM"},{"id":"p181","number":181,"local":"comz","visiteur":"Le Moose","date":"2026-07-13","heure":"6:00PM"},{"id":"p182","number":182,"local":"LMS Industrie","visiteur":"Roteux","date":"2026-07-13","heure":"6:55PM"},{"id":"p183","number":183,"local":"Centre Visuel des Eskers","visiteur":"Pikogan Nighthawks","date":"2026-07-13","heure":"7:50PM"},{"id":"p184","number":184,"local":"Mass'eau'Cryolipo","visiteur":"Les Starlettes","date":"2026-07-13","heure":"8:45PM"},{"id":"p185","number":185,"local":"La Relève","visiteur":"Pikogan Spartans","date":"2026-07-13","heure":"9:40PM"},{"id":"p186","number":186,"local":"Bar chez Frid","visiteur":"Mcdo","date":"2026-07-14","heure":"6:00PM"},{"id":"p187","number":187,"local":"Deshaies","visiteur":"Rihnolining","date":"2026-07-14","heure":"6:55PM"},{"id":"p188","number":188,"local":"Athena","visiteur":"Mass'eau'Cryolipo","date":"2026-07-14","heure":"7:50PM"},{"id":"p189","number":189,"local":"Flamingos","visiteur":"La Brosse","date":"2026-07-14","heure":"8:45PM"},{"id":"p190","number":190,"local":"Les Crinquées","visiteur":"Les Starlettes","date":"2026-07-14","heure":"9:40PM"},{"id":"p191","number":191,"local":"La Relève","visiteur":"Washaw Sibi Falcons","date":"2026-07-15","heure":"6:00PM"},{"id":"p192","number":192,"local":"LMS Industrie","visiteur":"Nortech solutions","date":"2026-07-15","heure":"6:55PM"},{"id":"p193","number":193,"local":"Hamel Arpentage","visiteur":"Hyundai Amos","date":"2026-07-15","heure":"7:50PM"},{"id":"p194","number":194,"local":"Les Crinquées","visiteur":"Thunder","date":"2026-07-15","heure":"8:45PM"},{"id":"p195","number":195,"local":"Mcdo","visiteur":"Pikogan Maikan","date":"2026-07-15","heure":"9:40PM"},{"id":"p196","number":196,"local":"Nortech solutions","visiteur":"Rihnolining","date":"2026-07-16","heure":"6:00PM"},{"id":"p197","number":197,"local":"Hardy Construction","visiteur":"Thunder","date":"2026-07-16","heure":"6:55PM"},{"id":"p198","number":198,"local":"Pikogan Nighthawks","visiteur":"Pikogan Spartans","date":"2026-07-16","heure":"7:50PM"},{"id":"p199","number":199,"local":"Bar chez Frid","visiteur":"Hyundai Amos","date":"2026-07-16","heure":"8:45PM"},{"id":"p200","number":200,"local":"La Brosse","visiteur":"Black Knight","date":"2026-07-16","heure":"9:40PM"},{"id":"p201","number":201,"local":"Athena","visiteur":"Les Starlettes","date":"2026-07-20","heure":"6:00PM"},{"id":"p202","number":202,"local":"comz","visiteur":"LMS Industrie","date":"2026-07-20","heure":"6:55PM"},{"id":"p203","number":203,"local":"La Brosse","visiteur":"Nortech solutions","date":"2026-07-20","heure":"7:50PM"},{"id":"p204","number":204,"local":"Hamel Arpentage","visiteur":"Mcdo","date":"2026-07-20","heure":"8:45PM"},{"id":"p205","number":205,"local":"Centre Visuel des Eskers","visiteur":"Pikogan Spartans","date":"2026-07-20","heure":"9:40PM"},{"id":"p206","number":206,"local":"La Relève","visiteur":"Pikogan Spartans","date":"2026-07-21","heure":"6:00PM"},{"id":"p207","number":207,"local":"Mes dentistes","visiteur":"Thunder","date":"2026-07-21","heure":"6:55PM"},{"id":"p208","number":208,"local":"Athena","visiteur":"Les Crinquées","date":"2026-07-21","heure":"7:50PM"},{"id":"p209","number":209,"local":"Mass'eau'Cryolipo","visiteur":"Les Starlettes","date":"2026-07-21","heure":"8:45PM"},{"id":"p211","number":211,"local":"Centre Visuel des Eskers","visiteur":"Pikogan Nighthawks","date":"2026-07-22","heure":"6:00PM"},{"id":"p212","number":212,"local":"Kirk Hockey Club","visiteur":"Nortech solutions","date":"2026-07-22","heure":"6:55PM"},{"id":"p213","number":213,"local":"Deshaies","visiteur":"Les supers amis","date":"2026-07-22","heure":"7:50PM"},{"id":"p214","number":214,"local":"Bar chez Frid","visiteur":"Mcdo","date":"2026-07-22","heure":"8:45PM"},{"id":"p215","number":215,"local":"comz","visiteur":"Flamingos","date":"2026-07-22","heure":"9:40PM"},{"id":"p217","number":217,"local":"Deshaies","visiteur":"Black Knight","date":"2026-07-23","heure":"6:55PM"},{"id":"p218","number":218,"local":"Hamel Arpentage","visiteur":"Pikogan Maikan","date":"2026-07-23","heure":"7:50PM"},{"id":"p219","number":219,"local":"Rihnolining","visiteur":"Roteux","date":"2026-07-23","heure":"8:45PM"},{"id":"p220","number":220,"local":"Hardy Construction","visiteur":"Les Crinquées","date":"2026-07-23","heure":"9:40PM"},{"id":"p221","number":221,"local":"Pikogan Nighthawks","visiteur":"Washaw Sibi Falcons","date":"2026-07-27","heure":"6:00PM"},{"id":"p222","number":222,"local":"Hardy Construction","visiteur":"Mass'eau'Cryolipo","date":"2026-07-27","heure":"6:55PM"},{"id":"p223","number":223,"local":"Flamingos","visiteur":"Roteux","date":"2026-07-27","heure":"7:50PM"},{"id":"p224","number":224,"local":"La Brosse","visiteur":"Les supers amis","date":"2026-07-27","heure":"8:45PM"},{"id":"p225","number":225,"local":"Hyundai Amos","visiteur":"Pikogan Maikan","date":"2026-07-27","heure":"9:40PM"},{"id":"p226","number":226,"local":"Bar chez Frid","visiteur":"Hamel Arpentage","date":"2026-07-28","heure":"6:00PM"},{"id":"p227","number":227,"local":"Nortech solutions","visiteur":"Roteux","date":"2026-07-28","heure":"6:55PM"},{"id":"p228","number":228,"local":"LMS Industrie","visiteur":"Black Knight","date":"2026-07-28","heure":"7:50PM"},{"id":"p229","number":229,"local":"Baho Média","visiteur":"Washaw Sibi Falcons","date":"2026-07-28","heure":"8:45PM"},{"id":"p230","number":230,"local":"Athena","visiteur":"Les Crinquées","date":"2026-07-28","heure":"9:40PM"},{"id":"p231","number":231,"local":"comz","visiteur":"Rihnolining","date":"2026-07-29","heure":"6:00PM"},{"id":"p232","number":232,"local":"La Brosse","visiteur":"LMS Industrie","date":"2026-07-29","heure":"6:55PM"},{"id":"p233","number":233,"local":"Le Moose","visiteur":"Les supers amis","date":"2026-07-29","heure":"7:50PM"},{"id":"p234","number":234,"local":"La Relève","visiteur":"Pikogan Nighthawks","date":"2026-07-29","heure":"8:45PM"},{"id":"p236","number":236,"local":"Hardy Construction","visiteur":"Thunder","date":"2026-07-30","heure":"6:00PM"},{"id":"p237","number":237,"local":"Kirk Hockey Club","visiteur":"Le Moose","date":"2026-07-30","heure":"6:55PM"},{"id":"p238","number":238,"local":"Bar chez Frid","visiteur":"Hamel Arpentage","date":"2026-07-30","heure":"7:50PM"},{"id":"p239","number":239,"local":"Les Crinquées","visiteur":"Mes dentistes","date":"2026-07-30","heure":"8:45PM"},{"id":"p241","number":241,"local":"Les Crinquées","visiteur":"Mes dentistes","date":"2026-08-03","heure":"6:00PM"},{"id":"p242","number":242,"local":"Athena","visiteur":"Thunder","date":"2026-08-03","heure":"6:55PM"},{"id":"p243","number":243,"local":"Hyundai Amos","visiteur":"Pikogan Maikan","date":"2026-08-03","heure":"7:50PM"},{"id":"p244","number":244,"local":"Deshaies","visiteur":"Kirk Hockey Club","date":"2026-08-03","heure":"8:45PM"},{"id":"p245","number":245,"local":"Baho Média","visiteur":"Washaw Sibi Falcons","date":"2026-08-03","heure":"9:40PM"}];
+
+const MY_ID = new URLSearchParams(window.location.search).get('id')||'';
+let db, membres={}, choix={}, draftStatus={};
+let semDraft=0, semHoraire=0;
+
+// ─── FIREBASE ──────────────────────────────────────────────────────
+const saved = localStorage.getItem('lla_fb_cfg');
+if(!saved){
+  document.getElementById('loading-screen').innerHTML='<div class="error-screen"><div style="font-size:48px">🔒</div><div style="font-size:18px;font-weight:500;margin:.75rem 0 .5rem">Configuration manquante</div><div style="font-size:14px;color:#666">Contacte ton coordinateur — l\'application doit d\'abord être configurée sur l\'admin.</div></div>';
+} else {
+  try {
+    const cfg = JSON.parse(saved);
+    const app = initializeApp(cfg);
+    db = getDatabase(app);
+    onValue(ref(db,'membres'),    snap=>{ membres     = snap.val()||{}; renderAll(); });
+    onValue(ref(db,'choix'),      snap=>{ choix       = snap.val()||{}; renderAll(); });
+    onValue(ref(db,'draftStatus'),snap=>{ draftStatus = snap.val()||{}; renderAll(); });
+    document.getElementById('loading-screen').style.display='none';
+    buildApp();
+  } catch(e){
+    document.getElementById('loading-screen').innerHTML=`<div class="error-screen"><div style="font-size:48px">⚠️</div><div style="font-size:18px;font-weight:500;margin:.75rem 0 .5rem">Erreur de connexion</div><div style="font-size:13px;color:#666">${e.message}</div></div>`;
+  }
+}
+
+// ─── HELPERS ───────────────────────────────────────────────────────
+function lundi(off){
+  const n=new Date(),d=n.getDay();
+  const l=new Date(n);l.setDate(n.getDate()-d+(d===0?-6:1)+off*7);l.setHours(0,0,0,0);return l;
+}
+function fmtD(d){return d.toLocaleDateString('fr-CA',{month:'short',day:'numeric'});}
+function semLabel(off){const l=lundi(off);const r=new Date(l);r.setDate(r.getDate()+6);return fmtD(l)+' – '+fmtD(r);}
+function partiesSem(off){
+  const l=lundi(off),r=new Date(l);r.setDate(r.getDate()+7);
+  return PARTIES_LLA.filter(p=>{const d=new Date(p.date+'T00:00:00');return d>=l&&d<r;})
+    .sort((a,b)=>(a.date+a.heure).localeCompare(b.date+b.heure));
+}
+function semIndex(off){const l=lundi(off),base=new Date('2026-05-11T00:00:00');return Math.max(0,Math.floor((l-base)/(7*864e5)));}
+function semKey(off){return 'sem'+semIndex(off);}
+function membresArr(){return Object.entries(membres).map(([id,m])=>({...m,id}));}
+function getOrdre(role,off){
+  const list=membresArr().filter(m=>m.role===role).sort((a,b)=>a.createdAt-b.createdAt);
+  if(!list.length)return[];
+  const n=list.length,si=semIndex(off)%n;
+  return Array.from({length:n},(_,i)=>list[(si+i)%n]);
+}
+function currentTurnIdx(role,off){
+  const sk=semKey(off),ds=draftStatus[role]||{};
+  return ds[sk]?.currentTurn||0;
+}
+function myRankInDraft(off){
+  const moi=membres[MY_ID]; if(!moi)return -1;
+  const ordre=getOrdre(moi.role,off);
+  return ordre.findIndex(x=>x.id===MY_ID);
+}
+function isMyTurn(off){
+  const moi=membres[MY_ID]; if(!moi)return false;
+  return myRankInDraft(off)===currentTurnIdx(moi.role,off);
+}
+function hasConfirmed(off){
+  const moi=membres[MY_ID]; if(!moi)return false;
+  const rank=myRankInDraft(off);
+  return rank<currentTurnIdx(moi.role,off);
+}
+
+// ─── BUILD APP ─────────────────────────────────────────────────────
+function buildApp(){
+  const moi=membres[MY_ID];
+  if(!moi){
+    document.getElementById('app').style.display='block';
+    document.getElementById('app').innerHTML=`<div class="error-screen"><div style="font-size:48px">🔒</div><div style="font-size:18px;font-weight:500;margin:.75rem 0 .5rem">Lien invalide</div><div style="font-size:14px;color:#666">Ce lien ne correspond à aucun membre.<br>Contacte ton coordinateur.</div></div>`;
+    return;
+  }
+  const isArb=moi.role==='arbitre';
+  const cls=isArb?'arb':'chro';
+  document.getElementById('app').style.display='block';
+  document.getElementById('app').innerHTML=`
+    <div class="header ${cls}">
+      <div><div class="header-title">${moi.nom}</div><div class="header-sub">LLA 2026 — ${isArb?'Arbitre':'Chronométreur'} · 🔥 En ligne</div></div>
+      <span class="badge-role badge-${cls}">${isArb?'Arbitre':'Chron.'}</span>
+    </div>
+    <div class="tabs">
+      <button class="tab active" id="tab-draft" onclick="showTab('draft')">🏆 Draft</button>
+      <button class="tab" id="tab-horaire" onclick="showTab('horaire')">📅 Horaire</button>
+    </div>
+    <div class="content">
+      <div id="page-draft" class="page active"></div>
+      <div id="page-horaire" class="page"></div>
+    </div>`;
+  renderDraftPage();
+  renderHorairePage();
+}
+
+window.showTab = function(t){
+  document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  document.getElementById('page-'+t).classList.add('active');
+};
+
+function renderAll(){
+  if(!membres[MY_ID]){ buildApp(); return; }
+  const dp=document.getElementById('page-draft');
+  const hp=document.getElementById('page-horaire');
+  if(dp) renderDraftPage();
+  if(hp) renderHorairePage();
+}
+
+// ─── DRAFT PAGE ────────────────────────────────────────────────────
+function renderDraftPage(){
+  const el=document.getElementById('page-draft'); if(!el)return;
+  const moi=membres[MY_ID]; if(!moi)return;
+  const isArb=moi.role==='arbitre'; const cls=isArb?'arb':'chro';
+  const myTurn=isMyTurn(semDraft);
+  const confirmed=hasConfirmed(semDraft);
+  const rank=myRankInDraft(semDraft);
+  const ordre=getOrdre(moi.role,semDraft);
+  const curTurn=currentTurnIdx(moi.role,semDraft);
+  const ps=partiesSem(semDraft);
+  const myCntSem=ps.filter(p=>choix[p.id]===MY_ID).length;
+  const totalChoix=Object.values(choix).filter(v=>v===MY_ID).length;
+
+  // Banner
+  let bannerHtml='';
+  if(ps.length===0){
+    bannerHtml=`<div class="draft-banner wait"><div class="draft-title">Aucune partie cette semaine</div><div class="draft-sub">Navigue vers une autre semaine.</div></div>`;
+  } else if(confirmed){
+    bannerHtml=`<div class="draft-banner done"><div class="draft-title">✅ Tu as confirmé tes choix!</div><div class="draft-sub">${myCntSem} partie${myCntSem!==1?'s':''} choisie${myCntSem!==1?'s':''} cette semaine · ${totalChoix} au total</div></div>`;
+  } else if(myTurn){
+    bannerHtml=`<div class="draft-banner ${cls}"><div class="draft-title" style="color:${isArb?'#0C447C':'#27500A'}">🎯 C'est ton tour de choisir!</div><div class="draft-sub">Sélectionne tes parties puis clique <strong>Confirmer mes choix</strong>.</div></div>`;
+  } else {
+    const tourRestant=rank-curTurn;
+    const enAttente=ordre[curTurn];
+    bannerHtml=`<div class="draft-banner wait"><div class="draft-title">⏳ En attente — ${tourRestant} personne${tourRestant>1?'s':''} avant toi</div><div class="draft-sub">Tu pourras choisir quand <strong>${enAttente?enAttente.nom:'...'}</strong> aura confirmé ses choix.<br>Tu peux voir les parties déjà prises ci-dessous.</div></div>`;
+  }
+
+  // Confirmer box
+  let confirmBox='';
+  if(myTurn && ps.length>0){
+    confirmBox=`<div class="confirmer-box" id="confirm-box">
+      <div style="font-size:13px;font-weight:500;margin-bottom:4px">${myCntSem} partie${myCntSem!==1?'s':''} sélectionnée${myCntSem!==1?'s':''}</div>
+      <div style="font-size:12px;color:#666;margin-bottom:10px">Clique Confirmer quand tu as fini. Le prochain pourra alors faire ses choix.</div>
+      <button class="btn btn-confirmer" onclick="confirmerChoix()" ${myCntSem===0?'disabled':''}>
+        ✓ Confirmer mes choix
+      </button>
+    </div>`;
+  } else if(confirmed){
+    confirmBox=`<div class="confirmer-box confirmed"><div style="font-size:13px;font-weight:500;color:#27500A">✅ Choix confirmés — ${myCntSem} partie${myCntSem!==1?'s':''} cette semaine</div></div>`;
+  }
+
+  // Parties
+  const grouped={};
+  ps.forEach(p=>{(grouped[p.date]=grouped[p.date]||[]).push(p);});
+  const partiesHtml=Object.entries(grouped).map(([date,list])=>`
+    <div class="week-header">${new Date(date+'T00:00:00').toLocaleDateString('fr-CA',{weekday:'long',month:'long',day:'numeric'})}</div>
+    ${list.map(p=>{
+      const pris=choix[p.id];
+      const estMoi=pris===MY_ID;
+      const prisParAutre=pris&&pris!==MY_ID;
+      const cardClass=estMoi?(isArb?'card mine':'card mine-chro'):'card';
+      const canPick=myTurn&&!confirmed;
+      return `<div class="${cardClass}" style="margin-bottom:6px;padding:.75rem 1rem">
+        <div class="row-between">
+          <div>
+            <div style="font-size:13px;font-weight:500"><span class="num-badge">#${p.number}</span>${p.local} vs ${p.visiteur}</div>
+            <div class="partie-sub">${p.heure}</div>
+          </div>
+          ${estMoi&&canPick
+            ? `<button class="btn btn-sm btn-retirer" onclick="retirerChoix('${p.id}')">✕ Retirer</button>`
+            : estMoi&&confirmed
+              ? `<span class="badge b-mine">✓ Ma partie</span>`
+              : prisParAutre
+                ? `<span class="pris-badge">Déjà pris</span>`
+                : canPick
+                  ? `<button class="btn btn-sm btn-choisir ${cls}" onclick="choisirPartie('${p.id}')">+ Choisir</button>`
+                  : `<span style="font-size:11px;color:#aaa">${pris?'Pris':'Libre'}</span>`
+          }
+        </div>
+        ${estMoi?`<div style="font-size:11px;margin-top:4px;color:${isArb?'#185FA5':'#3B6D11'};font-weight:500">✓ Tu as choisi cette partie</div>`:''}
+      </div>`;
+    }).join('')}`).join('');
+
+  el.innerHTML=`
+    <div class="semaine-nav">
+      <button class="btn btn-sm" onclick="changerSemDraft(-1)">←</button>
+      <span class="semaine-label">${semLabel(semDraft)}</span>
+      <button class="btn btn-sm" onclick="changerSemDraft(1)">→</button>
+    </div>
+    ${bannerHtml}
+    ${confirmBox}
+    ${ps.length?partiesHtml:''}`;
+}
+
+window.choisirPartie = async function(pid){
+  if(!isMyTurn(semDraft)){return;}
+  if(choix[pid]&&choix[pid]!==MY_ID){alert('Cette partie vient d\'être prise!');return;}
+  await set(ref(db,`choix/${pid}`),MY_ID);
+};
+
+window.retirerChoix = async function(pid){
+  if(!isMyTurn(semDraft))return;
+  await remove(ref(db,`choix/${pid}`));
+};
+
+window.confirmerChoix = async function(){
+  const moi=membres[MY_ID]; if(!moi)return;
+  const rank=myRankInDraft(semDraft);
+  const sk=semKey(semDraft);
+  const curTurn=currentTurnIdx(moi.role,semDraft);
+  if(rank!==curTurn)return;
+  const ordre=getOrdre(moi.role,semDraft);
+  const next=curTurn+1;
+  await update(ref(db,`draftStatus/${moi.role}`),{[sk]:{currentTurn:next}});
+  // Si c'était le dernier → assigner les parties non choisies à admin
+  if(next>=ordre.length){
+    const ps=partiesSem(semDraft);
+    const updates={};
+    ps.forEach(p=>{
+      const preneurId=choix[p.id];
+      const preneur=preneurId?membresArr().find(x=>x.id===preneurId):null;
+      if(!preneurId||!preneur){
+        updates['choix/'+p.id]='admin_'+moi.role;
+      }
+    });
+    if(Object.keys(updates).length) await update(ref(db),updates);
+  }
+};
+
+window.changerSemDraft = function(d){semDraft+=d; renderDraftPage();};
+
+// ─── HORAIRE PAGE ──────────────────────────────────────────────────
+function renderHorairePage(){
+  const el=document.getElementById('page-horaire'); if(!el)return;
+  const moi=membres[MY_ID]; if(!moi)return;
+  const isArb=moi.role==='arbitre';
+  const ps=partiesSem(semHoraire);
+  const grouped={};
+  ps.forEach(p=>{(grouped[p.date]=grouped[p.date]||[]).push(p);});
+  const partiesHtml=ps.length===0?'<div class="empty">Aucune partie cette semaine.</div>':
+    Object.entries(grouped).map(([date,list])=>`
+      <div class="week-header">${new Date(date+'T00:00:00').toLocaleDateString('fr-CA',{weekday:'long',month:'long',day:'numeric'})}</div>
+      ${list.map(p=>{
+        const estMoi=choix[p.id]===MY_ID;
+        const pris=!!choix[p.id];
+        const cardClass=estMoi?(isArb?'card mine':'card mine-chro'):'card';
+        return `<div class="${cardClass}" style="margin-bottom:6px;padding:.75rem 1rem">
+          <div class="row-between">
+            <div>
+              <div style="font-size:13px;font-weight:500"><span class="num-badge">#${p.number}</span>${p.local} vs ${p.visiteur}</div>
+              <div class="partie-sub">${p.heure}</div>
+            </div>
+            ${estMoi?`<span class="badge b-mine">✓ Ma partie</span>`:choix[p.id]&&choix[p.id].startsWith('admin_')?`<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#633806">Admin</span>`:pris?`<span class="pris-badge">Assigné</span>`:`<span style="font-size:11px;color:#aaa">Libre</span>`}
+          </div>
+        </div>`;
+      }).join('')}`).join('');
+
+  el.innerHTML=`
+    <div class="semaine-nav">
+      <button class="btn btn-sm" onclick="changerSemH(-1)">←</button>
+      <span class="semaine-label">${semLabel(semHoraire)}</span>
+      <button class="btn btn-sm" onclick="changerSemH(1)">→</button>
+    </div>
+    <div style="font-size:12px;color:#666;margin-bottom:.875rem">Tes parties sont surlignées. Les autres sont assignées à tes collègues.</div>
+    ${partiesHtml}`;
+}
+
+window.changerSemH = function(d){semHoraire+=d; renderHorairePage();};
+</script>
+</body>
+</html>
