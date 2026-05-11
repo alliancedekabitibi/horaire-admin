@@ -203,7 +203,9 @@ function renderDraftPage(){
   const ordre=getOrdre(moi.role,semDraft);
   const curTurn=currentTurnIdx(moi.role,semDraft);
   const ps=partiesSem(semDraft);
-  const myCntSem=ps.filter(p=>choix[p.id]===MY_ID).length;
+  const moi2=membres[MY_ID];
+  const myRoleKey=(pid)=>pid+'_'+(moi2&&moi2.role==='arbitre'?'arb':'chro');
+  const myCntSem=ps.filter(p=>choix[myRoleKey(p.id)]===MY_ID).length;
   const totalChoix=Object.values(choix).filter(v=>v===MY_ID).length;
 
   // Banner
@@ -240,7 +242,9 @@ function renderDraftPage(){
   const partiesHtml=Object.entries(grouped).map(([date,list])=>`
     <div class="week-header">${new Date(date+'T00:00:00').toLocaleDateString('fr-CA',{weekday:'long',month:'long',day:'numeric'})}</div>
     ${list.map(p=>{
-      const pris=choix[p.id];
+      const moi3=membres[MY_ID];
+      const rk=p.id+'_'+(moi3&&moi3.role==='arbitre'?'arb':'chro');
+      const pris=choix[rk];
       const estMoi=pris===MY_ID;
       const prisParAutre=pris&&pris!==MY_ID;
       const cardClass=estMoi?(isArb?'card mine':'card mine-chro'):'card';
@@ -279,13 +283,17 @@ function renderDraftPage(){
 
 window.choisirPartie = async function(pid){
   if(!isMyTurn(semDraft)){return;}
-  if(choix[pid]&&choix[pid]!==MY_ID){alert('Cette partie vient d\'être prise!');return;}
-  await set(ref(db,`choix/${pid}`),MY_ID);
+  const moi=membres[MY_ID]; if(!moi)return;
+  const roleKey=pid+'_'+(moi.role==='arbitre'?'arb':'chro');
+  if(choix[roleKey]&&choix[roleKey]!==MY_ID){alert('Cette partie est déjà prise par un autre '+( moi.role==='arbitre'?'arbitre':'chronométreur')+'!');return;}
+  await set(ref(db,'choix/'+roleKey),MY_ID);
 };
 
 window.retirerChoix = async function(pid){
   if(!isMyTurn(semDraft))return;
-  await remove(ref(db,`choix/${pid}`));
+  const moi=membres[MY_ID]; if(!moi)return;
+  const roleKey=pid+'_'+(moi.role==='arbitre'?'arb':'chro');
+  await remove(ref(db,'choix/'+roleKey));
 };
 
 window.confirmerChoix = async function(){
@@ -301,11 +309,11 @@ window.confirmerChoix = async function(){
   if(next>=ordre.length){
     const ps=partiesSem(semDraft);
     const updates={};
+    const rSuffix=moi.role==='arbitre'?'arb':'chro';
     ps.forEach(p=>{
-      const preneurId=choix[p.id];
-      const preneur=preneurId?membresArr().find(x=>x.id===preneurId):null;
-      if(!preneurId||!preneur){
-        updates['choix/'+p.id]='admin_'+moi.role;
+      const rk=p.id+'_'+rSuffix;
+      if(!choix[rk]){
+        updates['choix/'+rk]='admin_'+moi.role;
       }
     });
     if(Object.keys(updates).length) await update(ref(db),updates);
@@ -326,8 +334,10 @@ function renderHorairePage(){
     Object.entries(grouped).map(([date,list])=>`
       <div class="week-header">${new Date(date+'T00:00:00').toLocaleDateString('fr-CA',{weekday:'long',month:'long',day:'numeric'})}</div>
       ${list.map(p=>{
-        const estMoi=choix[p.id]===MY_ID;
-        const pris=!!choix[p.id];
+        const moi4=membres[MY_ID];
+        const rk2=p.id+'_'+(moi4&&moi4.role==='arbitre'?'arb':'chro');
+        const estMoi=choix[rk2]===MY_ID;
+        const pris=!!(choix[rk2]||choix[p.id+'_arb']||choix[p.id+'_chro']);
         const cardClass=estMoi?(isArb?'card mine':'card mine-chro'):'card';
         return `<div class="${cardClass}" style="margin-bottom:6px;padding:.75rem 1rem">
           <div class="row-between">
@@ -335,7 +345,7 @@ function renderHorairePage(){
               <div style="font-size:13px;font-weight:500"><span class="num-badge">#${p.number}</span>${p.local} vs ${p.visiteur}</div>
               <div class="partie-sub">${p.heure}</div>
             </div>
-            ${estMoi?`<span class="badge b-mine">✓ Ma partie</span>`:choix[p.id]&&choix[p.id].startsWith('admin_')?`<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#633806">Admin</span>`:pris?`<span class="pris-badge">Assigné</span>`:`<span style="font-size:11px;color:#aaa">Libre</span>`}
+            ${estMoi?`<span class="badge b-mine">✓ Ma partie</span>`:choix[rk2]&&choix[rk2].startsWith('admin_')?`<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:#FAEEDA;color:#633806">Admin</span>`:pris?`<span class="pris-badge">Assigné</span>`:`<span style="font-size:11px;color:#aaa">Libre</span>`}
           </div>
         </div>`;
       }).join('')}`).join('');

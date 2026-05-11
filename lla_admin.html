@@ -287,7 +287,7 @@ function getOrdre(role, off){
   const n=list.length, si=semIndex(off)%n;
   return Array.from({length:n},(_,i)=>list[(si+i)%n]);
 }
-function nbChoixMembre(mid){ return Object.values(choix).filter(v=>v===mid).length; }
+function nbChoixMembre(mid){ return Object.keys(choix).filter(k=>choix[k]===mid).length; }
 function memberURL(mid){ return window.location.href.replace('lla_admin.html','lla_membre.html')+'?id='+mid; }
 function semKey(off){ return 'sem'+semIndex(off); }
 function currentTurnIdx(role, off){
@@ -373,7 +373,8 @@ window.resetDraftRole = async function(role){
   // Remove choices for this week
   const ps=partiesSem(0);
   const updates={};
-  ps.forEach(p=>{ if(choix[p.id]) { const m=membresArr().find(x=>x.id===choix[p.id]); if(m&&m.role===role) updates[`choix/${p.id}`]=null; } });
+  const rSuffix=role==='arbitre'?'arb':'chro';
+  ps.forEach(p=>{ const rk=p.id+'_'+rSuffix; if(choix[rk]) updates['choix/'+rk]=null; });
   if(Object.keys(updates).length) await update(ref(db),updates);
 };
 
@@ -387,17 +388,10 @@ window.passerTour = async function(role){
   if(next>=ordre.length){
     const ps=partiesSem(0);
     const updates={};
+    const rSuffix2=role==='arbitre'?'arb':'chro';
     ps.forEach(p=>{
-      const preneurId=choix[p.id];
-      const preneur=preneurId?membresArr().find(x=>x.id===preneurId):null;
-      // Partie libre OU assignée à un membre de l'autre rôle (ne pas écraser)
-      if(!preneurId || !preneur){
-        updates[`choix/${p.id}`]='admin_'+role;
-      } else if(preneur.role===role){
-        // déjà prise par ce rôle — laisser
-      } else {
-        // prise par l'autre rôle — laisser aussi
-      }
+      const rk=p.id+'_'+rSuffix2;
+      if(!choix[rk]){ updates['choix/'+rk]='admin_'+role; }
     });
     if(Object.keys(updates).length) await update(ref(db),updates);
     alert(`✅ Draft ${role==='arbitre'?'arbitres':'chronométreurs'} terminé!\nLes parties non choisies ont été assignées à Admin.`);
@@ -449,12 +443,17 @@ function renderHoraire(){
   el.innerHTML=Object.entries(grouped).map(([date,list])=>`
     <div class="week-header">${new Date(date+'T00:00:00').toLocaleDateString('fr-CA',{weekday:'long',month:'long',day:'numeric'})}</div>
     ${list.map(p=>{
-      const mid=choix[p.id]; const m=mid?membresArr().find(x=>x.id===mid):null;
-      if(fr!=='tous'&&(!m||m.role!==fr)) return '';
+      const midArb=choix[p.id+'_arb']; const mArb=midArb?membresArr().find(x=>x.id===midArb):null;
+      const midChro=choix[p.id+'_chro']; const mChro=midChro?membresArr().find(x=>x.id===midChro):null;
+      if(fr==='arbitre'&&!midArb) return '';
+      if(fr==='chronometeur'&&!midChro) return '';
       return `<div class="card" style="margin-bottom:6px;padding:.75rem 1rem">
         <div style="font-size:13px;font-weight:500"><span class="num-badge">#${p.number}</span>${p.local} vs ${p.visiteur}</div>
         <div class="partie-sub" style="margin-bottom:6px">${p.heure}</div>
-        ${mid&&mid.startsWith('admin_')?`<span class="badge b-turn">Admin</span>`:m?`<span class="badge ${m.role==='arbitre'?'b-arb':'b-chro'}">${m.nom}</span>`:'<span style="font-size:11px;color:#aaa">Non assigné</span>'}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          <span class="badge b-arb">${midArb&&midArb.startsWith('admin_')?'Admin':mArb?mArb.nom:'⚠ Arb. manquant'}</span>
+          <span class="badge b-chro">${midChro&&midChro.startsWith('admin_')?'Admin':mChro?mChro.nom:'⚠ Chron. manquant'}</span>
+        </div>
       </div>`;
     }).join('')}`).join('');
 }
