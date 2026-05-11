@@ -96,11 +96,15 @@ const FIREBASE_CONFIG = {
 try {
   const app = initializeApp(FIREBASE_CONFIG);
   db = getDatabase(app);
-  onValue(ref(db,'membres'),    snap=>{ membres     = snap.val()||{}; renderAll(); });
+  let appBuilt = false;
+  onValue(ref(db,'membres'), snap=>{
+    membres = snap.val()||{};
+    document.getElementById('loading-screen').style.display='none';
+    if(!appBuilt){ appBuilt=true; buildApp(); }
+    else { renderAll(); }
+  });
   onValue(ref(db,'choix'),      snap=>{ choix       = snap.val()||{}; renderAll(); });
   onValue(ref(db,'draftStatus'),snap=>{ draftStatus = snap.val()||{}; renderAll(); });
-  document.getElementById('loading-screen').style.display='none';
-  buildApp();
 } catch(e){
   document.getElementById('loading-screen').innerHTML=`<div class="error-screen"><div style="font-size:48px">⚠️</div><div style="font-size:18px;font-weight:500;margin:.75rem 0 .5rem">Erreur de connexion</div><div style="font-size:13px;color:#666">${e.message}</div></div>`;
 }
