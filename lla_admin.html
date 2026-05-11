@@ -89,7 +89,7 @@ input.config-input{margin-bottom:6px}
 </head>
 <body>
 
-<div id="setup-screen" style="padding:1.25rem;max-width:600px;margin:0 auto">
+<div id="setup-screen" style="display:none;padding:1.25rem;max-width:600px;margin:0 auto">
   <div style="background:#1a1a1a;color:#fff;padding:.875rem 1.25rem;border-radius:12px;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">
     <div><div style="font-size:15px;font-weight:500">LLA 2026 — Admin</div><div style="font-size:12px;color:#888">Configuration Firebase</div></div>
     <span style="background:#FAEEDA;color:#633806;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500">Admin</span>
@@ -243,6 +243,7 @@ async function initApp(cfg) {
     onValue(ref(db,'paiements'), snap=>{ paiements  = snap.val()||{}; renderAll(); });
     document.getElementById('setup-screen').style.display='none';
     document.getElementById('main-app').style.display='block';
+    localStorage.setItem('lla_fb_cfg', JSON.stringify(FIREBASE_CONFIG));
     document.getElementById('sem-label-h').textContent = semLabel(semH);
   } catch(e) {
     document.getElementById('msg-cfg').innerHTML=`<div class="msg msg-err">Connexion échouée: ${e.message}</div>`;
@@ -250,8 +251,17 @@ async function initApp(cfg) {
 }
 
 // Auto-reconnect
-const saved = localStorage.getItem('lla_fb_cfg');
-if(saved) { try{ initApp(JSON.parse(saved)); }catch(e){} }
+// Config Firebase codée en dur — connexion automatique
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDnu0qX_TVo5TWBjjqF_BssqUPr3QcmBy0",
+  authDomain: "lla-horaire-2026.firebaseapp.com",
+  databaseURL: "https://lla-horaire-2026-default-rtdb.firebaseio.com",
+  projectId: "lla-horaire-2026",
+  storageBucket: "lla-horaire-2026.firebasestorage.app",
+  messagingSenderId: "874018060355",
+  appId: "1:874018060355:web:eab17b1591d5ad1b63fcf6"
+};
+initApp(FIREBASE_CONFIG);
 
 // ─── HELPERS ───────────────────────────────────────────────────────
 function lundi(off){
