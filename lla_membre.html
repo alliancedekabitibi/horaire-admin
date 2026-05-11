@@ -83,22 +83,26 @@ let db, membres={}, choix={}, draftStatus={};
 let semDraft=0, semHoraire=0;
 
 // ─── FIREBASE ──────────────────────────────────────────────────────
-const saved = localStorage.getItem('lla_fb_cfg');
-if(!saved){
-  document.getElementById('loading-screen').innerHTML='<div class="error-screen"><div style="font-size:48px">🔒</div><div style="font-size:18px;font-weight:500;margin:.75rem 0 .5rem">Configuration manquante</div><div style="font-size:14px;color:#666">Contacte ton coordinateur — l\'application doit d\'abord être configurée sur l\'admin.</div></div>';
-} else {
-  try {
-    const cfg = JSON.parse(saved);
-    const app = initializeApp(cfg);
-    db = getDatabase(app);
-    onValue(ref(db,'membres'),    snap=>{ membres     = snap.val()||{}; renderAll(); });
-    onValue(ref(db,'choix'),      snap=>{ choix       = snap.val()||{}; renderAll(); });
-    onValue(ref(db,'draftStatus'),snap=>{ draftStatus = snap.val()||{}; renderAll(); });
-    document.getElementById('loading-screen').style.display='none';
-    buildApp();
-  } catch(e){
-    document.getElementById('loading-screen').innerHTML=`<div class="error-screen"><div style="font-size:48px">⚠️</div><div style="font-size:18px;font-weight:500;margin:.75rem 0 .5rem">Erreur de connexion</div><div style="font-size:13px;color:#666">${e.message}</div></div>`;
-  }
+// Config Firebase codée en dur — connexion automatique
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDnu0qX_TVo5TWBjjqF_BssqUPr3QcmBy0",
+  authDomain: "lla-horaire-2026.firebaseapp.com",
+  databaseURL: "https://lla-horaire-2026-default-rtdb.firebaseio.com",
+  projectId: "lla-horaire-2026",
+  storageBucket: "lla-horaire-2026.firebasestorage.app",
+  messagingSenderId: "874018060355",
+  appId: "1:874018060355:web:eab17b1591d5ad1b63fcf6"
+};
+try {
+  const app = initializeApp(FIREBASE_CONFIG);
+  db = getDatabase(app);
+  onValue(ref(db,'membres'),    snap=>{ membres     = snap.val()||{}; renderAll(); });
+  onValue(ref(db,'choix'),      snap=>{ choix       = snap.val()||{}; renderAll(); });
+  onValue(ref(db,'draftStatus'),snap=>{ draftStatus = snap.val()||{}; renderAll(); });
+  document.getElementById('loading-screen').style.display='none';
+  buildApp();
+} catch(e){
+  document.getElementById('loading-screen').innerHTML=`<div class="error-screen"><div style="font-size:48px">⚠️</div><div style="font-size:18px;font-weight:500;margin:.75rem 0 .5rem">Erreur de connexion</div><div style="font-size:13px;color:#666">${e.message}</div></div>`;
 }
 
 // ─── HELPERS ───────────────────────────────────────────────────────
